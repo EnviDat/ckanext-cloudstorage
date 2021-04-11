@@ -32,6 +32,9 @@ from werkzeug.datastructures import FileStorage as FlaskFileStorage
 ALLOWED_UPLOAD_TYPES = (cgi.FieldStorage, FlaskFileStorage)
 AWS_UPLOAD_PART_SIZE = 5 * 1024 * 1024
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 def _get_underlying_file(wrapper):
     if isinstance(wrapper, FlaskFileStorage):
@@ -173,6 +176,7 @@ class CloudStorage(object):
                 assert boto
                 return True
             except ImportError:
+                logger.info("Can not import 'boto', urls cannot be secured for download")
                 pass
 
         return False

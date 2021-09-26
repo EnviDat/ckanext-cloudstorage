@@ -40,8 +40,14 @@ def _get_object_url(uploader, name):
 
 
 def _delete_multipart(upload, uploader):
+    log.debug("_delete_multipart url {0}".format(_get_object_url(uploader, upload.name)))
+    log.debug("_delete_multipart id {0}".format(upload.id))
     resp = uploader.driver.connection.request(
-        _get_object_url(uploader, upload.name) + '?uploadId=' + upload.id,
+        _get_object_url(uploader, upload.name),
+        params={
+            'uploadId': upload.id
+#            'partNumber': part_number
+        },
         method='DELETE'
     )
     if not resp.success():
@@ -246,8 +252,13 @@ def abort_multipart(context, data_dict):
 
     resource_uploads = MultipartUpload.resource_uploads(id)
 
+    log.debug("abort_multipart package id={0}".format(id))
+
+    print(resource_uploads)
+
     aborted = []
     for upload in resource_uploads:
+        log.debug("abort_multipart upload id={0}".format(upload.id))
         _delete_multipart(upload, uploader)
 
         aborted.append(upload.id)

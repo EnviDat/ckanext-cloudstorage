@@ -54,8 +54,11 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
             this._progress.append(this._bar);
 
             this._progress.insertAfter(this._url.parent().parent());
-            this._resumeBtn = $('<a>', {class: 'hide btn btn-info controls'}).insertAfter(
+            this._cancelBtn = $('<a>', {class: 'hide btn btn-danger controls', style: 'top: -20px'}).insertAfter(
+                this._progress).text('Cancel');
+            this._resumeBtn = $('<a>', {class: 'hide btn btn-info controls', style: 'top: -20px'}).insertAfter(
                 this._progress).text('Resume Upload');
+
 
             var self = this;
 
@@ -128,7 +131,8 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
 
         _onEnableResumeBtn: function (operation) {
             var self = this;
-            this.$('.btn-remove-url').remove();
+            $('.btn-remove-url').addClass('hide');
+            //this._onDisableRemove(true)
             if (operation === 'choose'){
                 self._onDisableSave(true);
 
@@ -140,6 +144,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
                     case 'resume':
                         self._save.trigger('click');
                         self._onDisableResumeBtn();
+                        self._onDisableCancelBtn();
                         break;
                     case 'choose':
                     default:
@@ -150,13 +155,29 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
                 .show();
              this._resumeBtn.removeClass('hide')
 
+             this._cancelBtn
+                .off('click')
+                .on('click', function (event) {
+                        console.log('_cancelBtn');
+                        self._onDisableResumeBtn();
+                        self._onDisableCancelBtn();
+                        var id = self._id.val();
+                        self._onAbortUpload(id);
+                        //self._onCleanUpload();
+                })
+                .show();
+             this._cancelBtn.removeClass('hide')
+
         },
 
         _onDisableResumeBtn: function () {
             this._resumeBtn.hide();
             this._resumeBtn.addClass('hide')
         },
-
+        _onDisableCancelBtn: function () {
+            this._cancelBtn.hide();
+            this._cancelBtn.addClass('hide')
+        },
         _onUploadFail: function (e, data) {
             this._onHandleError('Upload fail');
             this._onCheckExistingMultipart('resume');
@@ -254,6 +275,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
                 this._progress.removeClass('hide');
                 $(window).scrollTop(this._form.scrollTop);
                 this._onDisableResumeBtn();
+                this._onDisableCancelBtn()
                 this._save.trigger('click');
 
                 if (loaded >= file.size){
@@ -291,12 +313,14 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
             } else {
                 try{
                     this._onDisableSave(true);
-                    this._onDisableRemove(true);
+                    //this._onDisableRemove(true);
+                    $('.btn-remove-url').addClass('hide');
                     this._onSaveForm();
                 } catch(error){
                     console.log(error);
                     this._onDisableSave(false);
                     this._onDisableRemove(false);
+                    $('.btn-remove-url').removeClass('hide');
                 }
             }
 
@@ -391,6 +415,19 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
                 },
                 function (data) {
                     console.log(data);
+                    $('.btn-remove-url').removeClass('hide');
+                    //self._onDisableRemove(false);
+
+                    self._uploadName = null
+                    self._uploadSize = null
+                    self._uploadedParts = null
+
+                    console.log('click remove button')
+                    console.log($('.btn-remove-url'))
+                    $('.btn-remove-url').trigger('click');
+                    self._onDisableSave(false)
+
+                    self._file.val('');
                 },
                 function (err) {
                     console.log(err);
@@ -453,16 +490,23 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
         },
 
         _onDisableSave: function (value) {
-            this._save.attr('disabled', value);
+            console.log(" save button: disable=" + value)
+            if(value){
+                this._save.attr('disabled', value);
+            } else {
+                this._save.removeAttr('disabled');
+            }
         },
 
        _onDisableRemove: function(value) {
-            $('.btn-remove-url').attr('disabled', value);
-            if (value) {
-                $('.btn-remove-url').off();
-            } else {
-                $('.btn-remove-url').on();
-            }
+//            $('.btn-remove-url').attr('disabled', value);
+//            if (value) {
+//                console.log("button is off")
+//                $('.btn-remove-url').off();
+//            } else {
+//                console.log("button is on")
+//                $('.btn-remove-url').on();
+//            }
         },
 
         _setProgress: function (progress, bar) {
@@ -485,7 +529,8 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
         },
 
         _onCleanUpload: function () {
-            this.$('.btn-remove-url').trigger('click');
+            console.log('_onCleanUpload');
+            $('.btn-remove-url').trigger('click');
         }
 
     };

@@ -80,17 +80,23 @@ def check_multipart(context, data_dict):
     :rtype: NoneType or dict
 
     """
+    log.debug("check_multipart")
 
     h.check_access('cloudstorage_check_multipart', data_dict)
     id = toolkit.get_or_bust(data_dict, 'id')
+
+    log.debug("check_multipart id=".format(id))
+
     try:
         upload = model.Session.query(MultipartUpload).filter_by(
             resource_id=id).one()
     except NoResultFound:
+        log.debug("check_multipart return None")
         return
     upload_dict = upload.as_dict()
     upload_dict['parts'] = model.Session.query(MultipartPart).filter(
         MultipartPart.upload == upload).count()
+    log.debug("check_multipart return=".format(upload_dict))
     return {'upload': upload_dict}
 
 

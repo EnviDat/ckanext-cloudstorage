@@ -89,6 +89,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
         },
 
         _onCheckExistingMultipart: function (operation) {
+            console.log("_onCheckExistingMultipart operation = ", operation)
             var self = this;
             var id = this._id.val();
             if (!id) return;
@@ -106,7 +107,6 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
                     self._uploadedParts = upload.parts;
                     self._uploadName = upload.original_name;
                     self._partNumber = self._uploadedParts + 1;
-
 
                     var current_chunk_size = self._file.fileupload('option', 'maxChunkSize');
                     var uploaded_bytes = current_chunk_size * upload.parts;
@@ -135,7 +135,6 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
             //this._onDisableRemove(true)
             if (operation === 'choose'){
                 self._onDisableSave(true);
-
             }
             this._resumeBtn
                 .off('click')
@@ -179,6 +178,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
             this._cancelBtn.addClass('hide')
         },
         _onUploadFail: function (e, data) {
+            console.error("_onUploadFail: Upload fail, error ", e, " data=", data)
             this._onHandleError('Upload fail');
             this._onCheckExistingMultipart('resume');
         },
@@ -433,6 +433,9 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
                     self._onDisableSave(false)
 
                     self._file.val('');
+
+                    self._save.trigger('click');
+
                 },
                 function (err) {
                     console.log(err);

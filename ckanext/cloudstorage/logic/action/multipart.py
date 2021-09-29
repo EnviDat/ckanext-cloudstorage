@@ -107,6 +107,7 @@ def initiate_multipart(context, data_dict):
     :rtype: dict
 
     """
+    log.debug("initiate_multipart")
 
     h.check_access('cloudstorage_initiate_multipart', data_dict)
     id, name, size = toolkit.get_or_bust(data_dict, ['id', 'name', 'size'])
@@ -118,6 +119,8 @@ def initiate_multipart(context, data_dict):
 
     upload_object = MultipartUpload.by_name(res_name)
 
+    log.debug("initiate_multipart upload_object={0}".format(upload_object))
+
     if upload_object is not None:
         _delete_multipart(upload_object, uploader)
         upload_object = None
@@ -125,9 +128,10 @@ def initiate_multipart(context, data_dict):
     if upload_object is None:
         for old_upload in model.Session.query(MultipartUpload).filter_by(
                 resource_id=id):
+            log.debug("initiate_multipart delete old_upload={0}".format(old_upload))
             _delete_multipart(old_upload, uploader)
 
-        # Find and remove previous file from this resourve
+        # Find and remove previous file from this resource
         _rindex = res_name.rfind('/')
         if ~_rindex:
             try:
@@ -160,10 +164,12 @@ def initiate_multipart(context, data_dict):
 
 def upload_multipart(context, data_dict):
     h.check_access('cloudstorage_upload_multipart', data_dict)
+    log.debug(" upload_multipart dict: {0}".format(data_dict))
     upload_id, part_number, part_content = toolkit.get_or_bust(
         data_dict,
         ['uploadId', 'partNumber', 'upload']
     )
+    log.debug(" upload_multipart upload id: {0}".format(upload_id))
 
     uploader = ResourceCloudStorage({})
     upload = model.Session.query(MultipartUpload).get(upload_id)

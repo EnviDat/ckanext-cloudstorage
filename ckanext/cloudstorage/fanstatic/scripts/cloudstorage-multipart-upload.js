@@ -228,6 +228,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
         },
 
         _onFileUploadAdd: function (event, data) {
+            console.log("_onFileUploadAdd")
             this._setProgress(0, this._bar);
             var file = data.files[0];
             var target = $(event.target);
@@ -249,6 +250,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
             }
 
             var chunkSize = this._countChunkSize(file.size, target.fileupload('option', 'maxChunkSize'));
+            console.log("_onFileUploadAdd: this._uploadName=", this._uploadName, "this._uploadSize=", this._uploadSize, "this._uploadedParts=",this._uploadedParts)
 
             if (this._uploadName && this._uploadSize && this._uploadedParts !== null) {
                 if (this._uploadSize !== file.size || this._uploadName !== file.name){
@@ -275,7 +277,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
                 this._progress.removeClass('hide');
                 $(window).scrollTop(this._form.scrollTop);
                 this._onDisableResumeBtn();
-                this._onDisableCancelBtn()
+                this._onDisableCancelBtn();
                 this._save.trigger('click');
 
                 if (loaded >= file.size){
@@ -298,6 +300,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
         },
 
         _onSaveClick: function(event, pass) {
+            console.log("_onFileUploadAdd this._file = ", this._file, "this._file.val()=",this._file.val() )
             if (pass || !window.FileList || !this._file || !this._file.val()) {
                 return;
             }
@@ -393,6 +396,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
         },
 
         _onPrepareUpload: function(file, id) {
+            console.log("_onPrepareUpload file=", file, " id=", file)
             return $.ajax({
                 method: 'POST',
                 url: this.sandbox.client.url('/api/action/cloudstorage_initiate_multipart'),
@@ -421,6 +425,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
                     self._uploadName = null
                     self._uploadSize = null
                     self._uploadedParts = null
+                    self._uploadId = null
 
                     console.log('click remove button')
                     console.log($('.btn-remove-url'))

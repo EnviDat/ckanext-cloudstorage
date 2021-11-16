@@ -247,6 +247,10 @@ def finish_multipart(context, data_dict):
                 context.copy(), {'id': data_dict.get('id')})
             pkg_dict = toolkit.get_action('package_show')(
                 context.copy(), {'id': res_dict['package_id']})
+            toolkit.get_action('resource_patch')(
+                dict(context.copy()),
+                dict(id=data_dict['id'], last_modified=datetime.datetime.now())
+            )
             if pkg_dict['state'] == 'draft':
                 toolkit.get_action('package_patch')(
                     dict(context.copy(), allow_state_change=True),

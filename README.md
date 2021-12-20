@@ -1,7 +1,7 @@
 # ckanext-cloudstorage
 
-Implements support for using S3, Azure, or any of 30+ providers supported by
-[libcloud][] to [CKAN][].
+Implements support for using S3, Azure, or any of 15 different storage
+providers supported by [libcloud][] to [CKAN][].
 
 # Setup
 
@@ -37,7 +37,7 @@ below have been tested:
 | Provider | Uploads | Downloads | Secure URLs (private resources) |
 | --- | --- | --- | --- |
 | Azure    | YES | YES | YES (if `azure-storage` is installed) |
-| AWS S3   | YES | YES | YES (if `boto` is installed) |
+| AWS S3   | YES | YES | YES (if `boto` is installed and `host` key added to `driver_options`) |
 | Rackspace | YES | YES | No |
 
 # What are "Secure URLs"?

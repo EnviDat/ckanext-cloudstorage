@@ -3,7 +3,8 @@
 import logging
 import datetime
 
-from pylons import config
+import libcloud.security
+
 from sqlalchemy.orm.exc import NoResultFound
 import ckan.model as model
 import ckan.lib.helpers as h
@@ -11,8 +12,22 @@ import ckan.plugins.toolkit as toolkit
 
 from ckanext.cloudstorage.storage import ResourceCloudStorage
 from ckanext.cloudstorage.model import MultipartUpload, MultipartPart
+from werkzeug.datastructures import FileStorage as FlaskFileStorage
+
+if toolkit.check_ckan_version("2.9"):
+    config = toolkit.config
+else:
+    from pylons import config
+
+libcloud.security.VERIFY_SSL_CERT = True
 
 log = logging.getLogger(__name__)
+
+
+def _get_underlying_file(wrapper):
+    if isinstance(wrapper, FlaskFileStorage):
+        return wrapper.stream
+    return wrapper.file
 
 
 def _get_max_multipart_lifetime():
@@ -25,8 +40,14 @@ def _get_object_url(uploader, name):
 
 
 def _delete_multipart(upload, uploader):
+    log.debug("_delete_multipart url {0}".format(_get_object_url(uploader, upload.name)))
+    log.debug("_delete_multipart id {0}".format(upload.id))
     resp = uploader.driver.connection.request(
-        _get_object_url(uploader, upload.name) + '?uploadId=' + upload.id,
+        _get_object_url(uploader, upload.name),
+        params={
+            'uploadId': upload.id
+#            'partNumber': part_number
+        },
         method='DELETE'
     )
     if not resp.success():
@@ -59,17 +80,23 @@ def check_multipart(context, data_dict):
     :rtype: NoneType or dict
 
     """
+    log.debug("check_multipart")
 
     h.check_access('cloudstorage_check_multipart', data_dict)
     id = toolkit.get_or_bust(data_dict, 'id')
+
+    log.debug("check_multipart id=".format(id))
+
     try:
         upload = model.Session.query(MultipartUpload).filter_by(
             resource_id=id).one()
     except NoResultFound:
+        log.debug("check_multipart return None")
         return
     upload_dict = upload.as_dict()
     upload_dict['parts'] = model.Session.query(MultipartPart).filter(
         MultipartPart.upload == upload).count()
+    log.debug("check_multipart return=".format(upload_dict))
     return {'upload': upload_dict}
 
 
@@ -86,17 +113,19 @@ def initiate_multipart(context, data_dict):
     :rtype: dict
 
     """
+    log.debug("initiate_multipart")
 
     h.check_access('cloudstorage_initiate_multipart', data_dict)
     id, name, size = toolkit.get_or_bust(data_dict, ['id', 'name', 'size'])
-    user_id = None
-    if context['auth_user_obj']:
-        user_id = context['auth_user_obj'].id
+    user_obj = model.User.get(context['user'])
+    user_id = user_obj.id if user_obj else None
 
     uploader = ResourceCloudStorage({'multipart_name': name})
     res_name = uploader.path_from_filename(id, name)
 
     upload_object = MultipartUpload.by_name(res_name)
+
+    log.debug("initiate_multipart upload_object={0}".format(upload_object))
 
     if upload_object is not None:
         _delete_multipart(upload_object, uploader)
@@ -105,35 +134,35 @@ def initiate_multipart(context, data_dict):
     if upload_object is None:
         for old_upload in model.Session.query(MultipartUpload).filter_by(
                 resource_id=id):
+            log.debug("initiate_multipart delete old_upload={0}".format(old_upload))
             _delete_multipart(old_upload, uploader)
 
+        # Find and remove previous file from this resource
         _rindex = res_name.rfind('/')
         if ~_rindex:
             try:
                 name_prefix = res_name[:_rindex]
-                for cloud_object in uploader.container.iterate_objects():
-                    if cloud_object.name.startswith(name_prefix):
-                        log.info('Removing cloud object: %s' % cloud_object)
-                        cloud_object.delete()
+                old_objects = uploader.driver.iterate_container_objects(
+                    uploader.container,
+                    name_prefix
+                )
+                for obj in old_objects:
+                    log.info('Removing cloud object: %s' % obj)
+                    obj.delete()
             except Exception as e:
                 log.exception('[delete from cloud] %s' % e)
 
-        resp = uploader.driver.connection.request(
-            _get_object_url(uploader, res_name) + '?uploads',
-            method='POST'
+        upload_object = MultipartUpload(
+            uploader.driver._initiate_multipart(
+                container=uploader.container,
+                object_name=res_name
+            ),
+            id,
+            res_name,
+            size,
+            name,
+            user_id
         )
-        if not resp.success():
-            raise toolkit.ValidationError(resp.error)
-        try:
-            upload_id = resp.object.find(
-                '{%s}UploadId' % resp.object.nsmap[None]).text
-        except AttributeError:
-            upload_id_list = filter(
-                lambda e: e.tag.endswith('UploadId'),
-                resp.object.getchildren()
-            )
-            upload_id = upload_id_list[0].text
-        upload_object = MultipartUpload(upload_id, id, res_name, size, name, user_id)
 
         upload_object.save()
     return upload_object.as_dict()
@@ -141,18 +170,29 @@ def initiate_multipart(context, data_dict):
 
 def upload_multipart(context, data_dict):
     h.check_access('cloudstorage_upload_multipart', data_dict)
+    log.debug(" upload_multipart dict: {0}".format(data_dict))
     upload_id, part_number, part_content = toolkit.get_or_bust(
-        data_dict, ['uploadId', 'partNumber', 'upload'])
+        data_dict,
+        ['uploadId', 'partNumber', 'upload']
+    )
+    log.debug(" upload_multipart upload id: {0}".format(upload_id))
 
     uploader = ResourceCloudStorage({})
     upload = model.Session.query(MultipartUpload).get(upload_id)
-
+    data = _get_underlying_file(part_content).read()
     resp = uploader.driver.connection.request(
         _get_object_url(
-            uploader, upload.name) + '?partNumber={0}&uploadId={1}'.format(
-                part_number, upload_id),
+            uploader, upload.name
+        ),
+        params={
+            'uploadId': upload_id,
+            'partNumber': part_number
+        },
         method='PUT',
-        data=bytearray(part_content.file.read())
+        headers={
+            'Content-Length': len(data)
+        },
+        data=data
     )
     if resp.status != 200:
         raise toolkit.ValidationError('Upload failed: part %s' % part_number)
@@ -193,9 +233,11 @@ def finish_multipart(context, data_dict):
     except Exception:
         pass
     uploader.driver._commit_multipart(
-        _get_object_url(uploader, upload.name),
-        upload_id,
-        chunks)
+        container=uploader.container,
+        object_name=upload.name,
+        upload_id=upload_id,
+        chunks=chunks
+    )
     upload.delete()
     upload.commit()
 
@@ -205,6 +247,10 @@ def finish_multipart(context, data_dict):
                 context.copy(), {'id': data_dict.get('id')})
             pkg_dict = toolkit.get_action('package_show')(
                 context.copy(), {'id': res_dict['package_id']})
+            toolkit.get_action('resource_patch')(
+                dict(context.copy()),
+                dict(id=data_dict['id'], last_modified=datetime.datetime.now())
+            )
             if pkg_dict['state'] == 'draft':
                 toolkit.get_action('package_patch')(
                     dict(context.copy(), allow_state_change=True),
@@ -222,8 +268,13 @@ def abort_multipart(context, data_dict):
 
     resource_uploads = MultipartUpload.resource_uploads(id)
 
+    log.debug("abort_multipart package id={0}".format(id))
+
+    print(resource_uploads)
+
     aborted = []
     for upload in resource_uploads:
+        log.debug("abort_multipart upload id={0}".format(upload.id))
         _delete_multipart(upload, uploader)
 
         aborted.append(upload.id)

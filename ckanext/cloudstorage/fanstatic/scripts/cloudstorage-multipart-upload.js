@@ -37,11 +37,28 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
             this._progress = $('<div>', {
                 class: 'hide controls progress progress-striped active'
             });
+
+            this._upload_message = $('<div>Please wait until upload finishes</div>');
+            this._upload_message.addClass("upload-message")
+            this._upload_message.css('margin-top', '10px');
+            this._upload_message.css('line-height', '0px');
+            this._upload_message.css('text-align', 'center');
+            this._upload_message.css('text-align', 'center');
+            this._progress.append(this._upload_message);
+
             this._bar = $('<div>', {class:'bar'});
+            this._bar.css('height', '100%');
+            this._bar.css('width', '0%');
+            this._bar.css('margin-top', '-10px');
+            this._bar.css('background-color', '#30b9ba');
             this._progress.append(this._bar);
+
             this._progress.insertAfter(this._url.parent().parent());
-            this._resumeBtn = $('<a>', {class: 'hide btn btn-info controls'}).insertAfter(
+            this._cancelBtn = $('<a>', {class: 'hide btn btn-danger controls', style: 'top: -20px'}).insertAfter(
+                this._progress).text('Cancel');
+            this._resumeBtn = $('<a>', {class: 'hide btn btn-info controls', style: 'top: -20px'}).insertAfter(
                 this._progress).text('Resume Upload');
+
 
             var self = this;
 
@@ -62,6 +79,9 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
             this._save.on('click', this._onSaveClick);
 
             this._onCheckExistingMultipart('choose');
+
+            (function blink() { $('.upload-message').fadeOut(500).fadeIn(500, blink); })();
+
         },
 
         _onChunkUploaded: function () {
@@ -69,6 +89,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
         },
 
         _onCheckExistingMultipart: function (operation) {
+            console.log("_onCheckExistingMultipart operation = ", operation)
             var self = this;
             var id = this._id.val();
             if (!id) return;
@@ -86,7 +107,6 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
                     self._uploadedParts = upload.parts;
                     self._uploadName = upload.original_name;
                     self._partNumber = self._uploadedParts + 1;
-
 
                     var current_chunk_size = self._file.fileupload('option', 'maxChunkSize');
                     var uploaded_bytes = current_chunk_size * upload.parts;
@@ -111,10 +131,10 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
 
         _onEnableResumeBtn: function (operation) {
             var self = this;
-            this.$('.btn-remove-url').remove();
+            $('.btn-remove-url').addClass('hide');
+            //this._onDisableRemove(true)
             if (operation === 'choose'){
                 self._onDisableSave(true);
-
             }
             this._resumeBtn
                 .off('click')
@@ -123,6 +143,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
                     case 'resume':
                         self._save.trigger('click');
                         self._onDisableResumeBtn();
+                        self._onDisableCancelBtn();
                         break;
                     case 'choose':
                     default:
@@ -131,13 +152,33 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
                     }
                 })
                 .show();
+             this._resumeBtn.removeClass('hide')
+
+             this._cancelBtn
+                .off('click')
+                .on('click', function (event) {
+                        console.log('_cancelBtn');
+                        self._onDisableResumeBtn();
+                        self._onDisableCancelBtn();
+                        var id = self._id.val();
+                        self._onAbortUpload(id);
+                        //self._onCleanUpload();
+                })
+                .show();
+             this._cancelBtn.removeClass('hide')
+
         },
 
         _onDisableResumeBtn: function () {
             this._resumeBtn.hide();
+            this._resumeBtn.addClass('hide')
         },
-
+        _onDisableCancelBtn: function () {
+            this._cancelBtn.hide();
+            this._cancelBtn.addClass('hide')
+        },
         _onUploadFail: function (e, data) {
+            console.error("_onUploadFail: Upload fail, error ", e, " data=", data)
             this._onHandleError('Upload fail');
             this._onCheckExistingMultipart('resume');
         },
@@ -155,6 +196,8 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
 
             this._setProgressType('info', this._progress);
             this._progress.show('slow');
+            $(window).scrollTop(this._form.scrollTop);
+            this._progress.removeClass('hide');
         },
 
         _onGenerateAdditionalData: function (form) {
@@ -185,11 +228,29 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
         },
 
         _onFileUploadAdd: function (event, data) {
+            console.log("_onFileUploadAdd")
             this._setProgress(0, this._bar);
             var file = data.files[0];
             var target = $(event.target);
 
+            if (this.options.maxSize && (! isNaN(parseInt(this.options.maxSize)))){
+               var max_size = parseInt(this.options.maxSize);
+               var file_size_gb = file.size/1073741824
+               if (file_size_gb > max_size) {
+                    this._file.val('');
+                    this._onCleanUpload();
+                    this.sandbox.notify(
+                        'Too large file:',
+                        'You selected a file larger than '+ max_size + 'GB. Contact support for an alternative upload method or select a smaller one.',
+                        'error'
+                    );
+                    event.preventDefault();
+                    throw 'Too large file';
+                }
+            }
+
             var chunkSize = this._countChunkSize(file.size, target.fileupload('option', 'maxChunkSize'));
+            console.log("_onFileUploadAdd: this._uploadName=", this._uploadName, "this._uploadSize=", this._uploadSize, "this._uploadedParts=",this._uploadedParts)
 
             if (this._uploadName && this._uploadSize && this._uploadedParts !== null) {
                 if (this._uploadSize !== file.size || this._uploadName !== file.name){
@@ -197,13 +258,12 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
                     this._onCleanUpload();
                     this.sandbox.notify(
                         'Mismatch file',
-                        'You are trying to upload wrong file. Cancel previous upload first.',
+                        'You are trying to upload wrong file. Select '+ this._uploadName + ' or delete this resource and create a new one.',
                         'error'
                     );
                     event.preventDefault();
                     throw 'Wrong file';
                 }
-
 
                 var loaded = chunkSize * this._uploadedParts;
 
@@ -214,7 +274,10 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
                 });
 
                 this._progress.show('slow');
+                this._progress.removeClass('hide');
+                $(window).scrollTop(this._form.scrollTop);
                 this._onDisableResumeBtn();
+                this._onDisableCancelBtn();
                 this._save.trigger('click');
 
                 if (loaded >= file.size){
@@ -222,7 +285,6 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
                 }
 
             }
-
 
             target.fileupload('option', 'maxChunkSize', chunkSize);
 
@@ -238,6 +300,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
         },
 
         _onSaveClick: function(event, pass) {
+            console.log("_onFileUploadAdd this._file = ", this._file, "this._file.val()=",this._file.val() )
             if (pass || !window.FileList || !this._file || !this._file.val()) {
                 return;
             }
@@ -253,10 +316,14 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
             } else {
                 try{
                     this._onDisableSave(true);
+                    //this._onDisableRemove(true);
+                    $('.btn-remove-url').addClass('hide');
                     this._onSaveForm();
                 } catch(error){
                     console.log(error);
                     this._onDisableSave(false);
+                    this._onDisableRemove(false);
+                    $('.btn-remove-url').removeClass('hide');
                 }
             }
 
@@ -276,6 +343,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
             formData.url = file.name;
             formData.package_id = this.options.packageId;
             formData.size = file.size;
+            formData.url_type = 'upload';
             var action = formData.id ? 'resource_update' : 'resource_create';
             var url = this._form.attr('action') || window.location.href;
             this.sandbox.client.call(
@@ -328,7 +396,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
         },
 
         _onPrepareUpload: function(file, id) {
-
+            console.log("_onPrepareUpload file=", file, " id=", file)
             return $.ajax({
                 method: 'POST',
                 url: this.sandbox.client.url('/api/action/cloudstorage_initiate_multipart'),
@@ -342,7 +410,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
         },
 
         _onAbortUpload: function(id) {
-            var self = this;
+           var self = this;
             this.sandbox.client.call(
                 'POST',
                 'cloudstorage_abort_multipart',
@@ -351,6 +419,23 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
                 },
                 function (data) {
                     console.log(data);
+                    $('.btn-remove-url').removeClass('hide');
+                    //self._onDisableRemove(false);
+
+                    self._uploadName = null
+                    self._uploadSize = null
+                    self._uploadedParts = null
+                    self._uploadId = null
+
+                    console.log('click remove button')
+                    console.log($('.btn-remove-url'))
+                    $('.btn-remove-url').trigger('click');
+                    self._onDisableSave(false)
+
+                    self._file.val('');
+
+                    self._save.trigger('click');
+
                 },
                 function (err) {
                     console.log(err);
@@ -374,6 +459,7 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
                 function (data) {
 
                     self._progress.hide('fast');
+                    self._progress.addClass('hide');
                     self._onDisableSave(false);
 
                     if (self._resourceId && self._packageId){
@@ -412,7 +498,23 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
         },
 
         _onDisableSave: function (value) {
-            this._save.attr('disabled', value);
+            console.log(" save button: disable=" + value)
+            if(value){
+                this._save.attr('disabled', value);
+            } else {
+                this._save.removeAttr('disabled');
+            }
+        },
+
+       _onDisableRemove: function(value) {
+//            $('.btn-remove-url').attr('disabled', value);
+//            if (value) {
+//                console.log("button is off")
+//                $('.btn-remove-url').off();
+//            } else {
+//                console.log("button is on")
+//                $('.btn-remove-url').on();
+//            }
         },
 
         _setProgress: function (progress, bar) {
@@ -435,7 +537,8 @@ ckan.module('cloudstorage-multipart-upload', function($, _) {
         },
 
         _onCleanUpload: function () {
-            this.$('.btn-remove-url').trigger('click');
+            console.log('_onCleanUpload');
+            $('.btn-remove-url').trigger('click');
         }
 
     };

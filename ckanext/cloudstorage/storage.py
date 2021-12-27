@@ -497,9 +497,6 @@ class ResourceCloudStorage(CloudStorage):
         :returns: Signed URL or None.
         """
 
-        # UploadPartCommand({Bucket, Key, Conditions, Fields, Expires, UploadID, PartNumber});
-        # await getSignedUrl(s3Client, uploadPartCommand, {expiresIn: 3600});
-
         # Find the key the file *should* be stored at.
         path = self.path_from_filename(rid, filename)
 
@@ -509,26 +506,23 @@ class ResourceCloudStorage(CloudStorage):
         conditions = []
         fields = []
         expiresIn = 3600
-        expiry = datetime.utcnow() + timedelta(hours=1)
-
-        logger.debug("get_s3_signed_url_multipart: path = " + path)
 
         if self.can_use_advanced_aws and self.use_secure_urls:
-            from boto.s3.connection import S3Connection
-            import boto
-            os.environ['S3_USE_SIGV4'] = 'True'
+            import boto3
+            from botocore.config import Config
 
-            s3_connection = S3Connection(
-                self.driver_options['key'],
-                self.driver_options['secret'],
-                host=self.driver_options['host'],
-                debug=1
-            )
+            client = boto3.client('s3',
+                                  aws_access_key_id=self.driver_options['key'],
+                                  aws_secret_access_key=self.driver_options['secret'],
+                                  endpoint_url='https://' + self.driver_options['host'])
 
-            s3_connection.auth_region_name = self.driver_options['region_name']
+            signed_url = client.generate_presigned_url(ClientMethod='upload_part',
+                                                       Params={'Bucket': bucket, 'Key': key,
+                                                               'UploadId': uploadID,
+                                                               'PartNumber': partNumber},
+                                                       ExpiresIn=expiresIn
+                                                       )
 
-            signed_url = s3_connection.generate_url_sigv4(expires_in=expiresIn, method="PUT", bucket=bucket, key=key)
-            logger.debug(" ** Signed url = {0}".format(signed_url))
             return signed_url
 
         return "notAvailable"

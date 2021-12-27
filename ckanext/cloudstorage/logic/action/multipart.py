@@ -11,6 +11,8 @@ import ckan.logic as logic
 import ckan.lib.helpers as h
 import ckan.plugins.toolkit as toolkit
 
+import requests
+
 from ckanext.cloudstorage.storage import ResourceCloudStorage
 from ckanext.cloudstorage.model import MultipartUpload, MultipartPart
 from werkzeug.datastructures import FileStorage as FlaskFileStorage
@@ -85,23 +87,18 @@ def check_multipart(context, data_dict):
     :rtype: NoneType or dict
 
     """
-    log.debug("check_multipart")
-
     h.check_access('cloudstorage_check_multipart', data_dict)
     id = toolkit.get_or_bust(data_dict, 'id')
-
-    log.debug("check_multipart id=".format(id))
 
     try:
         upload = model.Session.query(MultipartUpload).filter_by(
             resource_id=id).one()
     except NoResultFound:
-        log.debug("check_multipart return None")
+        log.error("check_multipart return None")
         return
     upload_dict = upload.as_dict()
     upload_dict['parts'] = model.Session.query(MultipartPart).filter(
         MultipartPart.upload == upload).count()
-    log.debug("check_multipart return=".format(upload_dict))
     return {'upload': upload_dict}
 
 
@@ -212,8 +209,6 @@ def upload_multipart(context, data_dict):
 def get_presigned_url_multipart(context, data_dict):
     h.check_access('cloudstorage_get_presigned_url_multipart', data_dict)
 
-    log.debug(" get_presigned_url_multipart dict: {0}".format(data_dict))
-
     signed_url = None
 
     try:
@@ -222,13 +217,11 @@ def get_presigned_url_multipart(context, data_dict):
             ['id', 'uploadId', 'partNumber', 'upload']
         )
         name = part_content.filename
-
         uploader = ResourceCloudStorage({})
-        log.debug(" get_presigned_url_multipart data: {0}".format([rid, name, upload_id, part_number]))
 
-        signed_url = uploader.get_s3_signed_url_multipart(rid, name, upload_id, part_number)
+        signed_url = uploader.get_s3_signed_url_multipart(rid, name, upload_id, int(part_number))
     except Exception as e:
-        log.error("EXCEPTION: {0}".fotmat(e))
+        log.error("EXCEPTION get_presigned_url_multipart: {0}".format(e))
         traceback.print_exc(file=sys.stderr)
 
     return signed_url
@@ -278,20 +271,32 @@ def get_presigned_url_download(context, data_dict):
 
     return signed_url
 
+
 def upload_multipart_presigned(context, data_dict):
     h.check_access('cloudstorage_upload_multipart_presigned', data_dict)
-    log.debug("PRESIGNED upload_multipart dict: {0}".format(data_dict))
+
     upload_id, part_number, part_content = toolkit.get_or_bust(
         data_dict,
         ['uploadId', 'partNumber', 'upload']
     )
-    log.debug(" upload_multipart_presigned upload id: {0}".format(upload_id))
 
     # get presigned url
     presigned_url = get_presigned_url_multipart(context, data_dict)
-    log.debug(" upload_multipart_presigned URL: {0}".format(presigned_url))
 
-    return upload_multipart(context, data_dict)
+    upload = model.Session.query(MultipartUpload).get(upload_id)
+    data = _get_underlying_file(part_content).read()
+
+    resp = requests.put(presigned_url, data=data)
+
+    if resp.status_code != 200:
+        raise toolkit.ValidationError('Upload failed ({0}: part {1}'.format(resp.status_code, part_number))
+
+    _save_part_info(part_number, resp.headers['etag'], upload)
+
+    return {
+        'partNumber': part_number,
+        'ETag': resp.headers['etag']
+    }
 
 
 def finish_multipart(context, data_dict):

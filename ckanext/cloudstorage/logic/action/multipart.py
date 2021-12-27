@@ -226,6 +226,33 @@ def get_presigned_url_multipart(context, data_dict):
 
     return signed_url
 
+@toolkit.side_effect_free
+def get_presigned_url_list_multipart(context, data_dict):
+    h.check_access('cloudstorage_get_presigned_url_multipart', data_dict)
+
+    presignedUrls = {}
+
+    try:
+        rid, upload_id, part_number_list, filename = toolkit.get_or_bust(
+            data_dict,
+            ['id', 'uploadId', 'partNumbersList', 'filename']
+        )
+
+        uploader = ResourceCloudStorage({})
+
+        parts = part_number_list.split(',')
+
+        for part in parts:
+            part_number = part.strip()
+            signed_url = uploader.get_s3_signed_url_multipart(rid, filename, upload_id, int(part_number))
+            presignedUrls[part_number] = signed_url
+
+    except Exception as e:
+        log.error("EXCEPTION get_presigned_url_list_multipart: {0}".format(e))
+        traceback.print_exc(file=sys.stderr)
+
+    return {'presignedUrls': presignedUrls}
+
 
 @toolkit.side_effect_free
 def get_presigned_url_download(context, data_dict):

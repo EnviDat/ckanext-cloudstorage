@@ -7,6 +7,9 @@ def get_actions():
     return {
         'cloudstorage_initiate_multipart': multipart.initiate_multipart,
         'cloudstorage_upload_multipart': multipart.upload_multipart,
+        'cloudstorage_get_presigned_url_download': multipart.get_presigned_url_download,
+        'cloudstorage_get_presigned_url_multipart': multipart.get_presigned_url_multipart,
+        'cloudstorage_upload_multipart_presigned': multipart.upload_multipart_presigned,
         'cloudstorage_finish_multipart': multipart.finish_multipart,
         'cloudstorage_abort_multipart': multipart.abort_multipart,
         'cloudstorage_check_multipart': multipart.check_multipart,

@@ -438,6 +438,58 @@ class ResourceCloudStorage(CloudStorage):
                 return obj.extra['url']
             raise
 
+    def get_s3_signed_url_multipart(self, rid, filename, uploadID, partNumber, content_type=None):
+        """
+        Retrieve a signed URL to upload a multipart part from the frontend.
+
+        .. note::
+
+            Works for Azure and any libcloud driver that implements
+            support for get_object_cdn_url (ex: AWS S3).
+
+        :param rid: The resource ID.
+        :param filename: The resource filename.
+        :param content_type: Optionally a Content-Type header.
+
+        :returns: Signed URL or None.
+        """
+
+        # UploadPartCommand({Bucket, Key, Conditions, Fields, Expires, UploadID, PartNumber});
+        # await getSignedUrl(s3Client, uploadPartCommand, {expiresIn: 3600});
+
+        # Find the key the file *should* be stored at.
+        path = self.path_from_filename(rid, filename)
+
+        # parameters
+        bucket = self.container_name
+        key = path
+        conditions = []
+        fields = []
+        expiresIn = 3600
+        expiry = datetime.utcnow() + timedelta(hours=1)
+
+        logger.debug("get_s3_signed_url_multipart: path = " + path)
+
+        if self.can_use_advanced_aws and self.use_secure_urls:
+            from boto.s3.connection import S3Connection
+            import boto
+            os.environ['S3_USE_SIGV4'] = 'True'
+
+            s3_connection = S3Connection(
+                self.driver_options['key'],
+                self.driver_options['secret'],
+                host=self.driver_options['host'],
+                debug=1
+            )
+
+            s3_connection.auth_region_name = self.driver_options['region_name']
+
+            signed_url = s3_connection.generate_url_sigv4(expires_in=expiresIn, method="PUT", bucket=bucket, key=key)
+            logger.debug(" ** Signed url = {0}".format(signed_url))
+            return signed_url
+
+        return "notAvailable"
+
     @property
     def package(self):
         return model.Package.get(self.resource['package_id'])

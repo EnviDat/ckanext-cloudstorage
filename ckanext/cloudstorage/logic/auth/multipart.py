@@ -11,6 +11,10 @@ def upload_multipart(context, data_dict):
     return {'success': check_access('resource_create', context, data_dict)}
 
 
+def get_presigned_url_multipart(context, data_dict):
+    return {'success': check_access('resource_create', context, data_dict)}
+
+
 def finish_multipart(context, data_dict):
     return {'success': check_access('resource_create', context, data_dict)}
 

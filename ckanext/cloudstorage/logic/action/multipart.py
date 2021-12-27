@@ -19,6 +19,9 @@ if toolkit.check_ckan_version("2.9"):
 else:
     from pylons import config
 
+import sys, traceback
+
+
 libcloud.security.VERIFY_SSL_CERT = True
 
 log = logging.getLogger(__name__)
@@ -50,6 +53,7 @@ def _delete_multipart(upload, uploader):
         },
         method='DELETE'
     )
+    
     if not resp.success():
         raise toolkit.ValidationError(resp.error)
 
@@ -202,6 +206,31 @@ def upload_multipart(context, data_dict):
         'partNumber': part_number,
         'ETag': resp.headers['etag']
     }
+
+
+def get_presigned_url_multipart(context, data_dict):
+    h.check_access('cloudstorage_get_presigned_url_multipart', data_dict)
+
+    log.debug(" get_presigned_url_multipart dict: {0}".format(data_dict))
+
+    signed_url = None
+
+    try:
+        rid, upload_id, part_number, part_content = toolkit.get_or_bust(
+            data_dict,
+            ['id', 'uploadId', 'partNumber', 'upload']
+        )
+        name = part_content.filename
+
+        uploader = ResourceCloudStorage({})
+        log.debug(" get_presigned_url_multipart data: {0}".format([rid, name, upload_id, part_number]))
+
+        signed_url = uploader.get_s3_signed_url_multipart(rid, name, upload_id, part_number)
+    except Exception as e:
+        log.error("EXCEPTION: {0}".fotmat(e))
+        traceback.print_exc(file=sys.stderr)
+
+    return signed_url
 
 
 def finish_multipart(context, data_dict):

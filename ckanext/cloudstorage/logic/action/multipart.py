@@ -7,6 +7,7 @@ import libcloud.security
 
 from sqlalchemy.orm.exc import NoResultFound
 import ckan.model as model
+import ckan.logic as logic
 import ckan.lib.helpers as h
 import ckan.plugins.toolkit as toolkit
 
@@ -207,7 +208,7 @@ def upload_multipart(context, data_dict):
         'ETag': resp.headers['etag']
     }
 
-
+@toolkit.side_effect_free
 def get_presigned_url_multipart(context, data_dict):
     h.check_access('cloudstorage_get_presigned_url_multipart', data_dict)
 
@@ -231,6 +232,66 @@ def get_presigned_url_multipart(context, data_dict):
         traceback.print_exc(file=sys.stderr)
 
     return signed_url
+
+
+@toolkit.side_effect_free
+def get_presigned_url_download(context, data_dict):
+
+    '''Return the direct cloud download link for a resource.
+
+    :param id: the id of the resource
+    :type id: string
+
+    :url: string
+
+    '''
+
+    signed_url = None
+
+    id = toolkit.get_or_bust(data_dict, 'id')
+
+    model = context['model']
+    resource = model.Resource.get(id)
+    resource_context = dict(context, resource=resource)
+
+    if not resource:
+        raise logic.NotFound
+
+    toolkit.check_access('resource_show', resource_context, data_dict)
+
+    # if resource type is url, return its url
+    if resource.url_type != 'upload':
+        return resource.url
+
+    # request a presigned GET url
+    try:
+        name = resource.url
+        uploader = ResourceCloudStorage({})
+        signed_url = uploader.get_s3_signed_url_download(id, name)
+    except Exception as e:
+        log.error("EXCEPTION: {0}".format(e))
+        traceback.print_exc(file=sys.stderr)
+        raise e
+
+    if not signed_url:
+        raise toolkit.ValidationError("Cannot provide a URL. Cloud storage not compatible.")
+
+    return signed_url
+
+def upload_multipart_presigned(context, data_dict):
+    h.check_access('cloudstorage_upload_multipart_presigned', data_dict)
+    log.debug("PRESIGNED upload_multipart dict: {0}".format(data_dict))
+    upload_id, part_number, part_content = toolkit.get_or_bust(
+        data_dict,
+        ['uploadId', 'partNumber', 'upload']
+    )
+    log.debug(" upload_multipart_presigned upload id: {0}".format(upload_id))
+
+    # get presigned url
+    presigned_url = get_presigned_url_multipart(context, data_dict)
+    log.debug(" upload_multipart_presigned URL: {0}".format(presigned_url))
+
+    return upload_multipart(context, data_dict)
 
 
 def finish_multipart(context, data_dict):

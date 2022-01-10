@@ -207,6 +207,8 @@ def upload_multipart(context, data_dict):
 
 @toolkit.side_effect_free
 def get_presigned_url_multipart(context, data_dict):
+    log.debug("get_presigned_url_multipart")
+    
     h.check_access('cloudstorage_get_presigned_url_multipart', data_dict)
 
     signed_url = None
@@ -216,18 +218,26 @@ def get_presigned_url_multipart(context, data_dict):
             data_dict,
             ['id', 'uploadId', 'partNumber', 'upload']
         )
+        log.debug(
+            f"Resource ID: {id} | Upload ID: {upload_id} "
+            f"| Part number: {part_number} | File name: {part_content.filename}"
+        )
         name = part_content.filename
         uploader = ResourceCloudStorage({})
 
+        log.debug(f"Signing URL for upload id: {upload_id}")
         signed_url = uploader.get_s3_signed_url_multipart(rid, name, upload_id, int(part_number))
     except Exception as e:
         log.error("EXCEPTION get_presigned_url_multipart: {0}".format(e))
         traceback.print_exc(file=sys.stderr)
 
+    log.debug(f"Presigned URL: {signed_url}")
     return signed_url
 
 @toolkit.side_effect_free
 def get_presigned_url_list_multipart(context, data_dict):
+    log.debug("get_presigned_url_list_multipart")
+    
     h.check_access('cloudstorage_get_presigned_url_multipart', data_dict)
 
     presignedUrls = {}
@@ -237,6 +247,10 @@ def get_presigned_url_list_multipart(context, data_dict):
             data_dict,
             ['id', 'uploadId', 'partNumbersList', 'filename']
         )
+        log.debug(
+            f"Resource ID: {id} | Upload ID: {upload_id} "
+            f"| Part number list: {part_number_list} | File name: {filename}"
+        )
 
         uploader = ResourceCloudStorage({})
 
@@ -244,6 +258,7 @@ def get_presigned_url_list_multipart(context, data_dict):
 
         for part in parts:
             part_number = part.strip()
+            log.debug(f"Signing URL for part: {part_number} upload id: {upload_id}")
             signed_url = uploader.get_s3_signed_url_multipart(rid, filename, upload_id, int(part_number))
             presignedUrls[part_number] = signed_url
 
@@ -251,6 +266,7 @@ def get_presigned_url_list_multipart(context, data_dict):
         log.error("EXCEPTION get_presigned_url_list_multipart: {0}".format(e))
         traceback.print_exc(file=sys.stderr)
 
+    log.debug(f"Presigned URLs: {presignedUrls}")
     return {'presignedUrls': presignedUrls}
 
 
@@ -266,6 +282,7 @@ def get_presigned_url_download(context, data_dict):
 
     '''
 
+    log.debug("get_presigned_url_download")
     signed_url = None
 
     id = toolkit.get_or_bust(data_dict, 'id')
@@ -287,6 +304,7 @@ def get_presigned_url_download(context, data_dict):
     try:
         name = resource.url
         uploader = ResourceCloudStorage({})
+        log.debug(f"Signing URL to download resource id: {id}")
         signed_url = uploader.get_s3_signed_url_download(id, name)
     except Exception as e:
         log.error("EXCEPTION: {0}".format(e))
@@ -296,23 +314,28 @@ def get_presigned_url_download(context, data_dict):
     if not signed_url:
         raise toolkit.ValidationError("Cannot provide a URL. Cloud storage not compatible.")
 
+    log.debug(f"Presigned URL: {signed_url}")
     return signed_url
 
 
 def upload_multipart_presigned(context, data_dict):
+    log.debug("upload_multipart_presigned")
+    
     h.check_access('cloudstorage_upload_multipart_presigned', data_dict)
 
     upload_id, part_number, part_content = toolkit.get_or_bust(
         data_dict,
         ['uploadId', 'partNumber', 'upload']
     )
+    log.debug(f"Upload ID: {upload_id} | Part Number: {part_number}")
 
-    # get presigned url
+    log.debug("Generating presigned url.")
     presigned_url = get_presigned_url_multipart(context, data_dict)
 
     upload = model.Session.query(MultipartUpload).get(upload_id)
     data = _get_underlying_file(part_content).read()
 
+    log.debug("Uploading...")
     resp = requests.put(presigned_url, data=data)
 
     if resp.status_code != 200:
@@ -339,6 +362,7 @@ def finish_multipart(context, data_dict):
 
     """
 
+    log.debug("finish_multipart.")
     h.check_access('cloudstorage_finish_multipart', data_dict)
     upload_id = toolkit.get_or_bust(data_dict, 'uploadId')
     save_action = data_dict.get('save_action', False)
@@ -350,10 +374,13 @@ def finish_multipart(context, data_dict):
     ]
     uploader = ResourceCloudStorage({})
     try:
+        log.debug("Retrieving S3 object.")
         obj = uploader.container.get_object(upload.name)
         obj.delete()
     except Exception:
+        log.debug("S3 object not found, skipping...")
         pass
+    log.debug("Committing multipart object.")
     uploader.driver._commit_multipart(
         container=uploader.container,
         object_name=upload.name,
@@ -420,6 +447,7 @@ def clean_multipart(context, data_dict):
 
     """
 
+    log.debug("clean_multipart running...")
     h.check_access('cloudstorage_clean_multipart', data_dict)
     uploader = ResourceCloudStorage({})
     delta = _get_max_multipart_lifetime()

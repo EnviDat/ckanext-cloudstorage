@@ -362,8 +362,10 @@ def finish_multipart(context, data_dict):
     log.debug("finish_multipart.")
     h.check_access('cloudstorage_finish_multipart', data_dict)
     upload_id = toolkit.get_or_bust(data_dict, 'uploadId')
+    log.debug(f"upload_id: {upload_id}")
     save_action = data_dict.get('save_action', False)
     upload = model.Session.query(MultipartUpload).get(upload_id)
+    log.debug(f"Multipart upload record from database: {upload}")
     chunks = [
         (part.n, part.etag)
         for part in model.Session.query(MultipartPart).filter_by(
@@ -373,9 +375,11 @@ def finish_multipart(context, data_dict):
     try:
         log.debug("Retrieving S3 object.")
         obj = uploader.container.get_object(upload.name)
+        log.debug("Complete S3 object already exists, deleting...")
         obj.delete()
-    except Exception:
-        log.debug("S3 object not found, skipping...")
+    except Exception as e:
+        log.debug(f"Error retrieving pre-exiting S3 record: {e}")
+        log.debug("Proceeding with multipart commit...")
         pass
     log.debug("Committing multipart object.")
     uploader.driver._commit_multipart(

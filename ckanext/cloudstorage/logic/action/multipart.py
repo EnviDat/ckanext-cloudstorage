@@ -381,7 +381,13 @@ def finish_multipart(context, data_dict):
         log.debug(f"Error retrieving pre-exiting S3 record: {e}")
         log.debug("Proceeding with multipart commit...")
         pass
-    log.debug("Committing multipart object.")
+    log.debug(
+        "Committing multipart object with params: "
+        f"container={uploader.container} | "
+        f"object_name={upload.name} | "
+        f"upload_id={upload_id} | "
+        f"chunks={chunks}"
+    )
     uploader.driver._commit_multipart(
         container=uploader.container,
         object_name=upload.name,

@@ -254,10 +254,7 @@ def get_presigned_url_list_multipart(context, data_dict):
 
         uploader = ResourceCloudStorage({})
 
-        parts = part_number_list.split(',')
-
-        for part in parts:
-            part_number = part.strip()
+        for part_number in part_number_list:
             log.debug(f"Signing URL for part: {part_number} upload id: {upload_id}")
             signed_url = uploader.get_s3_signed_url_multipart(rid, filename, upload_id, int(part_number))
             presignedUrls[part_number] = signed_url

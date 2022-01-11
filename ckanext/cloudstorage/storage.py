@@ -514,7 +514,8 @@ class ResourceCloudStorage(CloudStorage):
             client = boto3.client('s3',
                                   aws_access_key_id=self.driver_options['key'],
                                   aws_secret_access_key=self.driver_options['secret'],
-                                  endpoint_url='https://' + self.driver_options['host'])
+                                  endpoint_url='https://' + self.driver_options['host'],
+                                  region_name=self.driver_options['region_name'])
 
             signed_url = client.generate_presigned_url(ClientMethod='upload_part',
                                                        Params={'Bucket': bucket, 'Key': key,

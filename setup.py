@@ -17,7 +17,7 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-        'apache-libcloud~=2.8.2'
+        'apache-libcloud~=3.4.1'
     ],
     entry_points=(
         """

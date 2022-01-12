@@ -213,7 +213,7 @@ def get_presigned_url_multipart(context, data_dict):
             data_dict, ["id", "uploadId", "partNumber", "upload"]
         )
         log.debug(
-            f"Resource ID: {id} | Upload ID: {upload_id} "
+            f"Resource ID: {rid} | Upload ID: {upload_id} "
             f"| Part number: {part_number} | File name: {part_content.filename}"
         )
         name = part_content.filename
@@ -358,7 +358,6 @@ def finish_multipart(context, data_dict):
     """
 
     log.debug("finish_multipart.")
-    log.debug(f"data_dict: {data_dict}")
     h.check_access("cloudstorage_finish_multipart", data_dict)
     upload_id = toolkit.get_or_bust(data_dict, "uploadId")
     log.debug(f"upload_id: {upload_id}")
@@ -366,14 +365,11 @@ def finish_multipart(context, data_dict):
         import json
 
         json_string = toolkit.get_or_bust(data_dict, "partInfo")
-        log.debug(f"json_string_pre: {json_string}")
         json_string = (
             json_string.replace("'", '"').replace('\\"', "").replace('""', '"')
         )
-        log.debug(f"json_string: {json_string}")
         part_info = json.loads(json_string)
         log.debug(f"part_info: {part_info}")
-        log.debug(f"{type(part_info)}")
     except toolkit.ValidationError as e:
         part_info = False
         log.debug("partInfo not found in data_dict, assuming not multipart")
@@ -415,6 +411,12 @@ def finish_multipart(context, data_dict):
     upload.upload_complete = True
     upload.commit()
 
+    s3_location = (
+        f"https://{uploader.driver_options.host}/"
+        f"{uploader.container_name}/{upload.name}"
+    )
+    log.debug(f"S3 upload location: {s3_location}")
+
     if save_action and save_action == "go-metadata":
         try:
             res_dict = toolkit.get_action("resource_show")(
@@ -434,7 +436,7 @@ def finish_multipart(context, data_dict):
                 )
         except Exception as e:
             log.error(e)
-    return {"commited": True}
+    return {"commited": True, "url": s3_location}
 
 
 def abort_multipart(context, data_dict):

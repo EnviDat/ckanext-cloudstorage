@@ -361,9 +361,9 @@ def finish_multipart(context, data_dict):
     h.check_access("cloudstorage_finish_multipart", data_dict)
     upload_id = toolkit.get_or_bust(data_dict, "uploadId")
     try:
-        import json
         json_string = toolkit.get_or_bust(data_dict, "partInfo")
-        json_string = json_string.replace('\'', '"').replace('""', '"')
+        # json_string.strip("[]").split("} ,")
+        json_string = json_string.replace('\'', '"').replace('\"\"', '"')
         print(json_string)
         part_info = json.loads(json_string)
         log.debug(f"part_info: {part_info}")

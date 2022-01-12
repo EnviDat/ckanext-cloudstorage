@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import logging
 import datetime
-import json
 
 import libcloud.security
 
@@ -363,7 +362,8 @@ def finish_multipart(context, data_dict):
     upload_id = toolkit.get_or_bust(data_dict, "uploadId")
     try:
         part_json = toolkit.get_or_bust(data_dict, "partInfo")
-        part_info = json.loads(part_json)
+        log.debug(f"part_json: {part_json}")
+        part_info = part_json.split(",")
         log.debug(f"part_info: {part_info}")
     except toolkit.ValidationError as e:
         part_info = False

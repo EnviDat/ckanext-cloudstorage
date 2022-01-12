@@ -411,8 +411,10 @@ def finish_multipart(context, data_dict):
     upload.upload_complete = True
     upload.commit()
 
+    log.debug(uploader)
+    log.debug(uploader.driver_options)
     s3_location = (
-        f"https://{uploader.driver_options[host]}/"
+        f"https://{uploader.driver_options['host']}/"
         f"{uploader.container_name}/{upload.name}"
     )
     log.debug(f"S3 upload location: {s3_location}")

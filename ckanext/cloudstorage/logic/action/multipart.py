@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import datetime
+import json
 
 import libcloud.security
 
@@ -360,13 +361,14 @@ def finish_multipart(context, data_dict):
     log.debug("finish_multipart.")
     h.check_access("cloudstorage_finish_multipart", data_dict)
     upload_id = toolkit.get_or_bust(data_dict, "uploadId")
-    log.debug(f"upload_id: {upload_id}")
     try:
-        part_info = toolkit.get_or_bust(data_dict, "partInfo")
+        part_json = toolkit.get_or_bust(data_dict, "partInfo")
+        part_info = json.loads(part_json)
         log.debug(f"part_info: {part_info}")
     except toolkit.ValidationError as e:
         part_info = False
         log.debug("partInfo not found in data_dict, assuming not multipart")
+    log.debug(f"upload_id: {upload_id}")
     log.debug(f"part_info: {part_info}")
     save_action = data_dict.get("save_action", False)
     upload = model.Session.query(MultipartUpload).get(upload_id)

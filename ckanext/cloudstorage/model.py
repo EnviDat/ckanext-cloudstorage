@@ -9,7 +9,8 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
-    Numeric
+    Numeric,
+    Boolean,
 )
 from datetime import datetime
 import ckan.model.meta as meta
@@ -72,3 +73,4 @@ class MultipartUpload(Base, DomainObject):
     size = Column(Numeric)
     original_name = Column(UnicodeText)
     user_id = Column(UnicodeText)
+    upload_complete = Column(Boolean, default=False)

@@ -361,15 +361,23 @@ def finish_multipart(context, data_dict):
     h.check_access("cloudstorage_finish_multipart", data_dict)
     upload_id = toolkit.get_or_bust(data_dict, "uploadId")
     log.debug(f"upload_id: {upload_id}")
+    try:
+        part_info = toolkit.get_or_bust(data_dict, "partInfo")
+        log.debug(f"part_info: {part_info}")
+    except toolkit.ValidationError as e:
+        log.debug("partInfo not found in data_dict, assuming not multipart")
     save_action = data_dict.get("save_action", False)
     upload = model.Session.query(MultipartUpload).get(upload_id)
     log.debug(f"Multipart upload record from database: {upload}")
-    chunks = [
-        (part.n, part.etag)
-        for part in model.Session.query(MultipartPart)
-        .filter_by(upload_id=upload_id)
-        .order_by(MultipartPart.n)
-    ]
+    if part_info:
+        chunks = [(part.PartNumber, part.ETag) for part in part_info]
+    else:
+        chunks = [
+            (part.n, part.etag)
+            for part in model.Session.query(MultipartPart)
+            .filter_by(upload_id=upload_id)
+            .order_by(MultipartPart.n)
+        ]
     uploader = ResourceCloudStorage({})
     try:
         log.debug("Retrieving S3 object.")
@@ -393,7 +401,7 @@ def finish_multipart(context, data_dict):
         upload_id=upload_id,
         chunks=chunks,
     )
-    upload.delete()
+    upload.upload_complete = True
     upload.commit()
 
     if save_action and save_action == "go-metadata":

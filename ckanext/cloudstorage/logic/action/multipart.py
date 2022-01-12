@@ -376,7 +376,7 @@ def finish_multipart(context, data_dict):
     upload = model.Session.query(MultipartUpload).get(upload_id)
     log.debug(f"Multipart upload record from database: {upload}")
     if part_info:
-        chunks = [(part.PartNumber, part.ETag) for part in part_info]
+        chunks = [(part['PartNumber'], part['ETag']) for part in part_info]
     else:
         chunks = [
             (part.n, part.etag)

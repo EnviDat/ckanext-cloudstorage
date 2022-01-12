@@ -360,23 +360,22 @@ def finish_multipart(context, data_dict):
     log.debug("finish_multipart.")
     h.check_access("cloudstorage_finish_multipart", data_dict)
     upload_id = toolkit.get_or_bust(data_dict, "uploadId")
+    log.debug(f"upload_id: {upload_id}")
     try:
         import json
+
         json_string = toolkit.get_or_bust(data_dict, "partInfo")
-        # json_string.strip("[]").split("} ,")
-        json_string = json_string.replace('\'', '"').replace('\"\"', '"')
-        print(json_string)
+        json_string = json_string.replace("'", '"').replace('""', '"')
         part_info = json.loads(json_string)
         log.debug(f"part_info: {part_info}")
     except toolkit.ValidationError as e:
         part_info = False
         log.debug("partInfo not found in data_dict, assuming not multipart")
-    log.debug(f"upload_id: {upload_id}")
     save_action = data_dict.get("save_action", False)
     upload = model.Session.query(MultipartUpload).get(upload_id)
     log.debug(f"Multipart upload record from database: {upload}")
     if part_info:
-        chunks = [(part['PartNumber'], part['ETag']) for part in part_info]
+        chunks = [(part["PartNumber"], part["ETag"]) for part in part_info]
     else:
         chunks = [
             (part.n, part.etag)

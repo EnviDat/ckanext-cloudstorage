@@ -358,12 +358,12 @@ def finish_multipart(context, data_dict):
     """
 
     log.debug("finish_multipart.")
+    log.debug(f"data_dict: {data_dict}")
     h.check_access("cloudstorage_finish_multipart", data_dict)
     upload_id = toolkit.get_or_bust(data_dict, "uploadId")
     log.debug(f"upload_id: {upload_id}")
     try:
         import json
-
         json_string = toolkit.get_or_bust(data_dict, "partInfo")
         log.debug(f"json_string_pre: {json_string}")
         json_string = json_string.replace("'", '"').replace('""', '"')

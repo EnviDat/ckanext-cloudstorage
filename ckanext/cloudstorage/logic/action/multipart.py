@@ -359,8 +359,10 @@ def finish_multipart(context, data_dict):
 
     log.debug("finish_multipart.")
     h.check_access("cloudstorage_finish_multipart", data_dict)
+    log.debug(f"data_dict: {data_dict}")
     upload_id = toolkit.get_or_bust(data_dict, "uploadId")
     log.debug(f"upload_id: {upload_id}")
+    part_info = False
     try:
         part_info = toolkit.get_or_bust(data_dict, "partInfo")
         log.debug(f"part_info: {part_info}")

@@ -352,8 +352,8 @@ def finish_multipart(context, data_dict):
 
     :param context:
     :param data_dict: dict with required key `uploadId` - id of Multipart Upload that should be finished
-    :returns: None
-    :rtype: NoneType
+    :returns: S3 url and commit confirmation
+    :rtype: dict
 
     """
 
@@ -412,7 +412,7 @@ def finish_multipart(context, data_dict):
     upload.commit()
 
     s3_location = (
-        f"https://{uploader.driver_options.host}/"
+        f"https://{uploader.driver_options[host]}/"
         f"{uploader.container_name}/{upload.name}"
     )
     log.debug(f"S3 upload location: {s3_location}")

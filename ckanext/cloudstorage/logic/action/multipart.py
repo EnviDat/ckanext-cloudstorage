@@ -363,7 +363,8 @@ def finish_multipart(context, data_dict):
     try:
         import json
         json_string = toolkit.get_or_bust(data_dict, "partInfo")
-        part_info = json.loads(json_string.replace('\'', '"'))
+        json_string = json_string.replace('\'', '"')
+        part_info = json.loads(json_string)
         log.debug(f"part_info: {part_info}")
     except toolkit.ValidationError as e:
         part_info = False

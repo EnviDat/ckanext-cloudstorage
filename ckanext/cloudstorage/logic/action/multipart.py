@@ -319,7 +319,9 @@ def get_presigned_url_download(context, data_dict):
 def multipart_list_parts(context, data_dict):
     log.debug("multipart_list_parts")
 
-    h.check_access("cloudstorage_multipart_list_parts", data_dict)
+    # h.check_access("cloudstorage_multipart_list_parts", data_dict)
+
+    multipart_parts = {}
 
     try:
         upload_id = toolkit.get_or_bust(data_dict, "uploadId")

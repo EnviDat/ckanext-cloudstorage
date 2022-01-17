@@ -326,20 +326,20 @@ def multipart_list_parts(context, data_dict):
     try:
         upload_id = toolkit.get_or_bust(data_dict, "uploadId")
 
-        log.debug(f"data_dict: {data_dict}")
-        if key := data_dict.get("uploadKey") is not None:
+        if upload_key := data_dict.get("uploadKey") is not None:
+            log.debug(f"upload_key: {upload_key}")
             rid = None
             filename = None
         else:
             rid, filename = toolkit.get_or_bust(data_dict, ["id", "filename"])
-            key = None
+            upload_key = None
         uploader = ResourceCloudStorage({})
         log.debug(
-            f"Upload ID: {upload_id} | Upload Key: {key} | "
+            f"Upload ID: {upload_id} | Upload Key: {upload_key} | "
             f"Resource ID: {rid} | File name: {filename}"
         )
         multipart_parts = uploader.get_s3_multipart_parts(
-            upload_id, key=key, rid=rid, filename=filename
+            upload_id, key=upload_key, rid=rid, filename=filename
         )
 
     except Exception as e:

@@ -341,7 +341,7 @@ def multipart_list_parts(context, data_dict):
             upload_id, key=upload_key, rid=rid, filename=filename
         )
         # Instead of json encoding datetime, simply remove LastModified
-        multipart_parts = [part.pop('LastModified') for part in multipart_parts]
+        multipart_parts = [part.pop('LastModified', None) for part in multipart_parts]
 
     except Exception as e:
         log.error(f"EXCEPTION multipart_list_parts: {e}")

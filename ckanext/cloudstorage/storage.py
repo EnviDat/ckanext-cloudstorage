@@ -559,19 +559,27 @@ class ResourceCloudStorage(CloudStorage):
 
         return "notAvailable"
 
-    def get_s3_multipart_parts(self, rid, filename, upload_id):
+    def get_s3_multipart_parts(self, upload_id, key=None, rid=None, filename=None):
         """
         Retrieve an array of S3 Part objects for a given multipart upload.
+        Requires either 'key', or 'rid' and 'filename'
 
-        :param rid: The resource ID.
-        :param filename: The resource filename.
         :param upload_id: The multipart upload ID.
+        :type upload_id: str
+        :param key: The multipart upload key path.
+        :type key: str, optional
+        :param rid: The resource ID.
+        :type rid: int, optional
+        :param filename: The resource filename.
+        :type filename: str, optional
+        
 
         :returns: Array of S3 Part objects or None.
         """
 
-        # Find the key the file *should* be stored at.
-        key = self.path_from_filename(rid, filename)
+        if key is None:
+            # Find the key the file *should* be stored at.
+            key = self.path_from_filename(rid, filename)
 
         bucket = self.container_name
 

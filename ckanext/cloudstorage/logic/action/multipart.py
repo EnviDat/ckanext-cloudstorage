@@ -322,14 +322,22 @@ def multipart_list_parts(context, data_dict):
     h.check_access("cloudstorage_multipart_list_parts", data_dict)
 
     try:
-        rid, filename, upload_id = toolkit.get_or_bust(
-            data_dict, ["id", "filename", "uploadId"]
-        )
-        log.debug(
-            f"Resource ID: {rid} | File name: {filename} | Upload ID: {upload_id}"
-        )
+        upload_id = toolkit.get_or_bust(data_dict, "uploadId")
+
+        if key := data_dict.get("key") is not None:
+            rid = None
+            filename = None
+        else:
+            rid, filename = toolkit.get_or_bust(data_dict, ["id", "filename"])
+            key = None
         uploader = ResourceCloudStorage({})
-        multipart_parts = uploader.get_s3_multipart_parts(rid, filename, upload_id)
+        log.debug(
+            f"Upload ID: {upload_id} | Upload Key: {key} | "
+            f"Resource ID: {rid} | File name: {filename}"
+        )
+        multipart_parts = uploader.get_s3_multipart_parts(
+            upload_id, key=key, rid=rid, filename=filename
+        )
 
     except Exception as e:
         log.error(f"EXCEPTION multipart_list_parts: {e}")

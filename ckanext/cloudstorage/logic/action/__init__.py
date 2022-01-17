@@ -11,6 +11,7 @@ def get_actions():
         'cloudstorage_get_presigned_url_multipart': multipart.get_presigned_url_multipart,
         'cloudstorage_get_presigned_url_list_multipart': multipart.get_presigned_url_list_multipart,
         'cloudstorage_upload_multipart_presigned': multipart.upload_multipart_presigned,
+        'cloudstorage_multipart_list_parts': multipart.multipart_list_parts,
         'cloudstorage_finish_multipart': multipart.finish_multipart,
         'cloudstorage_abort_multipart': multipart.abort_multipart,
         'cloudstorage_check_multipart': multipart.check_multipart,

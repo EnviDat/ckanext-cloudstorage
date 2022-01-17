@@ -244,7 +244,7 @@ def get_presigned_url_list_multipart(context, data_dict):
             data_dict, ["id", "uploadId", "partNumbersList", "filename"]
         )
         log.debug(
-            f"Resource ID: {id} | Upload ID: {upload_id} "
+            f"Resource ID: {rid} | Upload ID: {upload_id} "
             f"| Part number list: {part_number_list} | File name: {filename}"
         )
 
@@ -313,6 +313,43 @@ def get_presigned_url_download(context, data_dict):
 
     log.debug(f"Presigned URL: {signed_url}")
     return signed_url
+
+
+@toolkit.side_effect_free
+def multipart_list_parts(context, data_dict):
+    log.debug("multipart_list_parts")
+
+    # h.check_access("cloudstorage_multipart_list_parts", data_dict)
+
+    multipart_parts = {}
+
+    try:
+        upload_id = toolkit.get_or_bust(data_dict, "uploadId")
+
+        if (upload_key := data_dict.get("uploadKey")) is not None:
+            rid = None
+            filename = None
+        else:
+            rid, filename = toolkit.get_or_bust(data_dict, ["id", "filename"])
+            upload_key = None
+        uploader = ResourceCloudStorage({})
+        log.debug(
+            f"Upload ID: {upload_id} | Upload Key: {upload_key} | "
+            f"Resource ID: {rid} | File name: {filename}"
+        )
+        multipart_parts = uploader.get_s3_multipart_parts(
+            upload_id, key=upload_key, rid=rid, filename=filename
+        )
+        # Instead of json encoding datetime, simply remove LastModified
+        for part in multipart_parts:
+            part.pop('LastModified', None)
+
+    except Exception as e:
+        log.error(f"EXCEPTION multipart_list_parts: {e}")
+        traceback.print_exc(file=sys.stderr)
+
+    log.debug(f"Multipart parts: {multipart_parts}")
+    return multipart_parts
 
 
 def upload_multipart_presigned(context, data_dict):
@@ -482,8 +519,10 @@ def clean_multipart(context, data_dict):
     delta = _get_max_multipart_lifetime()
     oldest_allowed = datetime.datetime.utcnow() - delta
 
-    uploads_to_remove = model.Session.query(MultipartUpload).filter(
-        MultipartUpload.initiated < oldest_allowed
+    uploads_to_remove = (
+        model.Session.query(MultipartUpload)
+        .filter(MultipartUpload.initiated < oldest_allowed)
+        .filter(MultipartUpload.upload_complete == False)
     )
 
     result = {"removed": 0, "total": uploads_to_remove.count(), "errors": []}

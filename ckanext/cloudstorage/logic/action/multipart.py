@@ -327,7 +327,6 @@ def multipart_list_parts(context, data_dict):
         upload_id = toolkit.get_or_bust(data_dict, "uploadId")
 
         if (upload_key := data_dict.get("uploadKey")) is not None:
-            log.debug(f"upload_key: {upload_key}")
             rid = None
             filename = None
         else:
@@ -341,6 +340,8 @@ def multipart_list_parts(context, data_dict):
         multipart_parts = uploader.get_s3_multipart_parts(
             upload_id, key=upload_key, rid=rid, filename=filename
         )
+        # Instead of json encoding datetime, simply remove LastModified
+        multipart_parts = [part.pop('LastModified') for part in multipart_parts]
 
     except Exception as e:
         log.error(f"EXCEPTION multipart_list_parts: {e}")

@@ -244,7 +244,7 @@ def get_presigned_url_list_multipart(context, data_dict):
             data_dict, ["id", "uploadId", "partNumbersList", "filename"]
         )
         log.debug(
-            f"Resource ID: {id} | Upload ID: {upload_id} "
+            f"Resource ID: {rid} | Upload ID: {upload_id} "
             f"| Part number list: {part_number_list} | File name: {filename}"
         )
 
@@ -313,6 +313,30 @@ def get_presigned_url_download(context, data_dict):
 
     log.debug(f"Presigned URL: {signed_url}")
     return signed_url
+
+
+@toolkit.side_effect_free
+def multipart_list_parts(context, data_dict):
+    log.debug("multipart_list_parts")
+
+    h.check_access("cloudstorage_multipart_list_parts", data_dict)
+
+    try:
+        rid, filename, upload_id = toolkit.get_or_bust(
+            data_dict, ["id", "filename", "uploadId"]
+        )
+        log.debug(
+            f"Resource ID: {rid} | File name: {filename} | Upload ID: {upload_id}"
+        )
+        uploader = ResourceCloudStorage({})
+        multipart_parts = uploader.get_s3_multipart_parts(rid, filename, upload_id)
+
+    except Exception as e:
+        log.error(f"EXCEPTION multipart_list_parts: {e}")
+        traceback.print_exc(file=sys.stderr)
+
+    log.debug(f"Multipart parts: {multipart_parts}")
+    return multipart_parts
 
 
 def upload_multipart_presigned(context, data_dict):
@@ -482,8 +506,10 @@ def clean_multipart(context, data_dict):
     delta = _get_max_multipart_lifetime()
     oldest_allowed = datetime.datetime.utcnow() - delta
 
-    uploads_to_remove = model.Session.query(MultipartUpload).filter(
-        MultipartUpload.initiated < oldest_allowed
+    uploads_to_remove = (
+        model.Session.query(MultipartUpload)
+        .filter(MultipartUpload.initiated < oldest_allowed)
+        .filter(MultipartUpload.upload_complete == False)
     )
 
     result = {"removed": 0, "total": uploads_to_remove.count(), "errors": []}

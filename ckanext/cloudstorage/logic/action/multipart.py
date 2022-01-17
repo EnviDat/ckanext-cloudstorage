@@ -326,6 +326,7 @@ def multipart_list_parts(context, data_dict):
     try:
         upload_id = toolkit.get_or_bust(data_dict, "uploadId")
 
+        log.debug(f"data_dict: {data_dict}")
         if key := data_dict.get("uploadKey") is not None:
             rid = None
             filename = None

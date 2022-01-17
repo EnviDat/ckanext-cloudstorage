@@ -601,7 +601,10 @@ class ResourceCloudStorage(CloudStorage):
                 UploadId=upload_id,
             )
 
-            return parts_info["Parts"]
+            if "Parts" in parts_info:
+                return parts_info["Parts"]
+            else:
+                return []
 
         return "notAvailable"
 

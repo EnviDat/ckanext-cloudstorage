@@ -157,7 +157,7 @@ class CloudStorage(object):
     @property
     def can_use_advanced_aws(self):
         """
-        `True` if the `boto` module is installed and ckanext-cloudstorage has
+        `True` if the `boto3` module is installed and ckanext-cloudstorage has
         been configured to use Amazon S3, otherwise `False`.
         """
         # Are we even using AWS?
@@ -168,14 +168,14 @@ class CloudStorage(object):
                 return False
             try:
                 # Yes? Is the boto package available?
-                import boto
+                import boto3
 
                 # Shut the linter up.
-                assert boto
+                assert boto3
                 return True
             except ImportError:
                 logger.info(
-                    "Can not import 'boto', urls cannot be secured for download"
+                    "Can not import 'boto3', urls cannot be secured for download"
                 )
                 pass
 
@@ -409,27 +409,28 @@ class ResourceCloudStorage(CloudStorage):
                 ),
             )
         elif self.can_use_advanced_aws and self.use_secure_urls:
-            from boto.s3.connection import S3Connection
+            import boto3
+            from botocore.config import Config
 
-            os.environ["S3_USE_SIGV4"] = "True"
-            s3_connection = S3Connection(
-                self.driver_options["key"],
-                self.driver_options["secret"],
-                host=self.driver_options["host"],
+            client = boto3.client(
+                "s3",
+                aws_access_key_id=self.driver_options["key"],
+                aws_secret_access_key=self.driver_options["secret"],
+                endpoint_url="https://" + self.driver_options["host"],
+                region_name=self.driver_options["region_name"],
+                config=Config(signature_version="s3v4"),
             )
 
-            if "region_name" in self.driver_options.keys():
-                s3_connection.auth_region_name = self.driver_options["region_name"]
+            signed_url = client.generate_presigned_url(
+                ClientMethod="get_object",
+                Params={
+                    "Bucket": self.container_name,
+                    "Key": path,
+                },
+                ExpiresIn=3600,
+            )
 
-            generate_url_params = {
-                "expires_in": 60 * 60,
-                "method": "GET",
-                "bucket": self.container_name,
-                "key": path,
-            }
-            if content_type:
-                generate_url_params["headers"] = {"Content-Type": content_type}
-            return s3_connection.generate_url_sigv4(**generate_url_params)
+            return signed_url
 
         # Find the object for the given key.
         try:
@@ -443,7 +444,7 @@ class ResourceCloudStorage(CloudStorage):
         try:
             return self.driver.get_object_cdn_url(obj)
         except NotImplementedError:
-            if "S3" in self.driver_name:
+            if any(x in self.driver_name for x in ["S3", "MINIO"]):
                 return urljoin(
                     "https://" + self.driver.connection.host,
                     "{container}/{path}".format(
@@ -460,11 +461,6 @@ class ResourceCloudStorage(CloudStorage):
         """
         Retrieve a signed URL to download a multipart part from the frontend.
 
-        .. note::
-
-            Works for Azure and any libcloud driver that implements
-            support for get_object_cdn_url (ex: AWS S3).
-
         :param rid: The resource ID.
         :param filename: The resource filename.
         :param content_type: Optionally a Content-Type header.
@@ -475,32 +471,31 @@ class ResourceCloudStorage(CloudStorage):
         # Find the key the file *should* be stored at.
         path = self.path_from_filename(rid, filename)
 
-        # parameters
-        bucket = self.container_name
-        key = path
-        expiresIn = 3600
-
         if self.can_use_advanced_aws and self.use_secure_urls:
-            from boto.s3.connection import S3Connection
-            import boto
+            import boto3
+            from botocore.config import Config
 
-            os.environ["S3_USE_SIGV4"] = "True"
-
-            s3_connection = S3Connection(
-                self.driver_options["key"],
-                self.driver_options["secret"],
-                host=self.driver_options["host"],
+            client = boto3.client(
+                "s3",
+                aws_access_key_id=self.driver_options["key"],
+                aws_secret_access_key=self.driver_options["secret"],
+                endpoint_url="https://" + self.driver_options["host"],
+                region_name=self.driver_options["region_name"],
+                config=Config(signature_version="s3v4"),
             )
 
-            s3_connection.auth_region_name = self.driver_options["region_name"]
-
-            signed_url = s3_connection.generate_url_sigv4(
-                expires_in=expiresIn, method="GET", bucket=bucket, key=key
+            signed_url = client.generate_presigned_url(
+                ClientMethod="get_object",
+                Params={
+                    "Bucket": self.container_name,
+                    "Key": path,
+                },
+                ExpiresIn=3600,
             )
 
             return signed_url
 
-        return None
+        return "notAvailable"
 
     def get_s3_signed_url_multipart(
         self, rid, filename, upload_id, part_number, content_type=None
@@ -542,6 +537,7 @@ class ResourceCloudStorage(CloudStorage):
                 aws_secret_access_key=self.driver_options["secret"],
                 endpoint_url="https://" + self.driver_options["host"],
                 region_name=self.driver_options["region_name"],
+                config=Config(signature_version="s3v4"),
             )
 
             signed_url = client.generate_presigned_url(
@@ -572,7 +568,7 @@ class ResourceCloudStorage(CloudStorage):
         :type rid: int, optional
         :param filename: The resource filename.
         :type filename: str, optional
-        
+
 
         :returns: Array of S3 Part objects or None.
         """
@@ -593,6 +589,7 @@ class ResourceCloudStorage(CloudStorage):
                 aws_secret_access_key=self.driver_options["secret"],
                 endpoint_url="https://" + self.driver_options["host"],
                 region_name=self.driver_options["region_name"],
+                config=Config(signature_version="s3v4"),
             )
 
             parts_info = client.list_parts(

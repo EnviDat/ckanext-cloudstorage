@@ -17,6 +17,8 @@ import binascii
 from libcloud.storage.types import Provider, ObjectDoesNotExistError
 from libcloud.storage.providers import get_driver
 import libcloud.common.types as types
+import ssl
+import libcloud.security
 
 if p.toolkit.check_ckan_version("2.9"):
     from werkzeug.datastructures import FileStorage as UploadedFileType
@@ -64,6 +66,7 @@ def _md5sum(source_path):
 
 class CloudStorage(object):
     def __init__(self):
+        libcloud.security.SSL_VERSION = ssl.PROTOCOL_TLSv1_2
         self.driver = get_driver(getattr(Provider, self.driver_name))(
             **self.driver_options
         )

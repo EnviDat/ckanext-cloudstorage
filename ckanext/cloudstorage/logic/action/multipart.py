@@ -209,19 +209,19 @@ def get_presigned_url_multipart(context, data_dict):
     signed_url = None
 
     try:
-        rid, upload_id, part_number, part_content = toolkit.get_or_bust(
-            data_dict, ["id", "uploadId", "partNumber", "upload"]
+        rid, upload_id, part_number, filename = toolkit.get_or_bust(
+            data_dict, ["id", "uploadId", "partNumber", "filename"]
         )
         log.debug(
             f"Resource ID: {rid} | Upload ID: {upload_id} "
-            f"| Part number: {part_number} | File name: {part_content.filename}"
+            f"| Part number: {part_number} | File name: {filename}"
         )
-        name = part_content.filename
+
         uploader = ResourceCloudStorage({})
 
         log.debug(f"Signing URL for upload id: {upload_id}")
         signed_url = uploader.get_s3_signed_url_multipart(
-            rid, name, upload_id, int(part_number)
+            rid, filename, upload_id, int(part_number)
         )
     except Exception as e:
         log.error("EXCEPTION get_presigned_url_multipart: {0}".format(e))
@@ -353,6 +353,10 @@ def multipart_list_parts(context, data_dict):
 
 
 def upload_multipart_presigned(context, data_dict):
+    """
+    Helper function to generate and upload via pre-signed URL in one endpoint.
+    Required for edge cases only.
+    """
     log.debug("upload_multipart_presigned")
 
     h.check_access("cloudstorage_upload_multipart_presigned", data_dict)

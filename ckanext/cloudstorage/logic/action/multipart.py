@@ -342,7 +342,7 @@ def multipart_list_parts(context, data_dict):
         )
         # Instead of json encoding datetime, simply remove LastModified
         for part in multipart_parts:
-            part.pop('LastModified', None)
+            part.pop("LastModified", None)
 
     except Exception as e:
         log.error(f"EXCEPTION multipart_list_parts: {e}")
@@ -420,12 +420,15 @@ def finish_multipart(context, data_dict):
     if part_info:
         chunks = [(part["PartNumber"], part["ETag"]) for part in part_info]
     else:
-        chunks = [
-            (part.n, part.etag)
-            for part in model.Session.query(MultipartPart)
+        log.debug("Uploaded from CKAN UI, getting chunk records from DB")
+        chunk_db = (
+            model.Session.query(MultipartPart)
             .filter_by(upload_id=upload_id)
             .order_by(MultipartPart.n)
-        ]
+        )
+        chunks = [(part.n, part.etag) for part in chunk_db]
+    log.debug(f"Chunks available for multipart upload: {chunks}")
+
     uploader = ResourceCloudStorage({})
     try:
         log.debug("Retrieving S3 object.")
@@ -449,8 +452,13 @@ def finish_multipart(context, data_dict):
         upload_id=upload_id,
         chunks=chunks,
     )
-    upload.upload_complete = True
+    upload.delete()
     upload.commit()
+    if chunk_db:
+        if chunk_db.first() is not None:
+            log.debug("Deleting multipart chunk records from DB")
+            chunk_db.delete()
+            chunk_db.commit()
 
     s3_location = (
         f"https://{uploader.driver_options['host']}/"

@@ -455,10 +455,15 @@ def finish_multipart(context, data_dict):
     upload.delete()
     upload.commit()
     if chunk_db:
-        if chunk_db.first() is not None:
-            log.debug("Deleting multipart chunk records from DB")
-            chunk_db.delete()
-            chunk_db.commit()
+        log.debug("Uploaded from CKAN, checking database for chunk records")
+        try:
+            if chunk_db.first() is not None:
+                log.debug("Deleting multipart chunk records from DB")
+                chunk_db.delete()
+                chunk_db.commit()
+        except Exception as e:
+            log.error(e)
+            log.debug("Failed to delete multipart chunks from DB, or none exist")
 
     s3_location = (
         f"https://{uploader.driver_options['host']}/"

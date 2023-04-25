@@ -417,6 +417,8 @@ def finish_multipart(context, data_dict):
     save_action = data_dict.get("save_action", False)
     upload = model.Session.query(MultipartUpload).get(upload_id)
     log.debug(f"Multipart upload record from database: {upload}")
+
+    chunk_db = None
     if part_info:
         chunks = [(part["PartNumber"], part["ETag"]) for part in part_info]
     else:
@@ -452,8 +454,11 @@ def finish_multipart(context, data_dict):
         upload_id=upload_id,
         chunks=chunks,
     )
+    log.debug("Cleaning up multipart database record")
     upload.delete()
     upload.commit()
+
+    # Delete chunk records from DB, if CKAN upload
     if chunk_db:
         log.debug("Uploaded from CKAN, checking database for chunk records")
         try:

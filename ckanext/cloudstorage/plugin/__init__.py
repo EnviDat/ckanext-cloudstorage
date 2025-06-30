@@ -23,12 +23,17 @@ class CloudStoragePlugin(MixinPlugin, plugins.SingletonPlugin):
     plugins.implements(plugins.ITemplateHelpers)
     plugins.implements(plugins.IAuthFunctions)
     plugins.implements(plugins.IResourceController, inherit=True)
+    plugins.implements(plugins.IWebassets)
 
     # IConfigurer
 
     def update_config(self, config):
         plugins.toolkit.add_template_directory(config, '../templates')
-        plugins.toolkit.add_resource('../fanstatic/scripts', 'cloudstorage-js')
+        plugins.toolkit.add_resource('assets', 'cloudstorage-js')
+
+    def get_webassets_bundles(self):
+        # CKAN will automatically load bundles as defined in assets/webassets.yml
+        return {}
 
     # ITemplateHelpers
 
